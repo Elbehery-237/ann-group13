@@ -34,3 +34,29 @@ ann-group13/
 | Yousef Basuney | Chebyshev KAN | S4 experiment runner and aggregation |
 
 Shared modules have one owner; the others import them and do not copy or edit them.
+
+## Dataset — SRSD Feynman (Easy)
+
+Source: [omron-sinicx/srsd-benchmark](https://github.com/omron-sinicx/srsd-benchmark). Download the Easy set
+from Hugging Face into `data/`:
+
+```bash
+git lfs install
+git clone https://huggingface.co/datasets/yoshitomo-matsubara/srsd-feynman_easy data/srsd-feynman_easy
+```
+
+Expected layout: `data/srsd-feynman_easy/{train,val,test}/<name>.txt` (space-separated, last column = target;
+8000/1000/1000 rows) and `data/srsd-feynman_easy/true_eq/<name>.pkl` (sympy ground truth in `x0, x1, …`).
+30 problems. Set `SRSD_ROOT` if you keep it elsewhere.
+
+## Tests
+
+```bash
+pip install -r requirements.txt
+pytest -q          # data-dependent tests are skipped if the dataset is missing
+```
+
+## Implemented so far
+- `src/train.py` (S2) — `train()`, `set_seed()`, team-wide `DEFAULTS`.
+- `src/symbolic.py` (S5) — `load_true_eq()`, `to_original()`, `is_exact()`, `ned()`, `predict()`.
+  `ned()` reproduces the official SRSD `eq_comparator.py` procedure (MIT License).
