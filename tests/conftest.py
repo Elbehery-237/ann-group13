@@ -13,10 +13,15 @@ import torch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-SRSD_ROOT = Path(os.environ.get("SRSD_ROOT", ROOT / "data" / "srsd-feynman_easy"))
-EASY = sorted(p.stem for p in (SRSD_ROOT / "true_eq").glob("*.pkl")) if SRSD_ROOT.exists() else []
+SRSD_ROOT = Path(os.environ.get("SRSD_ROOT", ROOT / "data" / "srsd-feynman_medium"))
+PROBLEMS = sorted(p.stem for p in (SRSD_ROOT / "true_eq").glob("*.pkl")) if SRSD_ROOT.exists() else []
 
-needs_data = pytest.mark.skipif(not EASY, reason=f"SRSD Easy not found at {SRSD_ROOT} (set SRSD_ROOT)")
+needs_data = pytest.mark.skipif(not PROBLEMS, reason=f"SRSD data not found at {SRSD_ROOT} (set SRSD_ROOT)")
+
+
+def first_present(*names):
+    """First of `names` that exists in the selected SRSD set (tests work on Easy or Medium)."""
+    return next((n for n in names if n in PROBLEMS), None)
 
 
 def load_srsd(name, log_cols=()):

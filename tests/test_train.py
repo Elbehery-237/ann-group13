@@ -5,7 +5,7 @@ import pytest
 import torch
 from torch import nn
 
-from conftest import load_srsd, needs_data
+from conftest import first_present, load_srsd, needs_data
 from src.train import set_seed, train
 
 
@@ -93,9 +93,13 @@ def test_bad_shapes_rejected():
 # --- real SRSD data ---------------------------------------------------------------------
 @needs_data
 def test_srsd_linear_law_fit_exactly():
-    # feynman-iii.12.43: y = 3.313e-34 * x0 / pi. Min-max and standardization are affine,
-    # so in scaled space this is a line: a linear model must reach ~zero validation error.
-    data = load_srsd("feynman-iii.12.43")
+    # A law linear in its input (Medium: i.29.4 = 3.3e-9*x0; Easy: iii.12.43 = 3.313e-34*x0/pi).
+    # Min-max and standardization are affine, so in scaled space this is a line:
+    # a linear model must reach ~zero validation error.
+    name = first_present("feynman-i.29.4", "feynman-iii.12.43")
+    if name is None:
+        pytest.skip("no linear law in this set")
+    data = load_srsd(name)
     set_seed(0)
     model, hist, info = train(nn.Linear(data["d"], 1), data, lr=1e-2, max_epochs=3000)
     assert info["best_val"] < 1e-8
@@ -103,8 +107,12 @@ def test_srsd_linear_law_fit_exactly():
 
 @needs_data
 def test_srsd_product_law_mlp_learns():
-    # feynman-i.12.1: y = x0 * x1. Standardized target -> predicting the mean gives MSE ~ 1.
-    data = load_srsd("feynman-i.12.1")
+    # A product law (Medium: i.39.10 = 1.5*x0*x1; Easy: i.12.1 = x0*x1).
+    # Standardized target -> predicting the mean gives MSE ~ 1.
+    name = first_present("feynman-i.39.10", "feynman-i.12.1")
+    if name is None:
+        pytest.skip("no product law in this set")
+    data = load_srsd(name)
     set_seed(0)
     model, hist, info = train(_mlp(data["d"]), data, lr=1e-2, max_epochs=1500, patience=200)
     assert not info["diverged"] and math.isfinite(info["best_val"])

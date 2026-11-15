@@ -35,19 +35,21 @@ ann-group13/
 
 Shared modules have one owner; the others import them and do not copy or edit them.
 
-## Dataset — SRSD Feynman (Easy)
+## Dataset — SRSD Feynman (Medium)
 
-Source: [omron-sinicx/srsd-benchmark](https://github.com/omron-sinicx/srsd-benchmark). Download the Easy set
-from Hugging Face into `data/`:
+Source: [omron-sinicx/srsd-benchmark](https://github.com/omron-sinicx/srsd-benchmark). Download the Medium set
+from Hugging Face (in Colab, into the shared Drive folder):
 
 ```bash
 git lfs install
-git clone https://huggingface.co/datasets/yoshitomo-matsubara/srsd-feynman_easy data/srsd-feynman_easy
+git clone https://huggingface.co/datasets/yoshitomo-matsubara/srsd-feynman_medium data/srsd-feynman_medium
 ```
 
-Expected layout: `data/srsd-feynman_easy/{train,val,test}/<name>.txt` (space-separated, last column = target;
-8000/1000/1000 rows) and `data/srsd-feynman_easy/true_eq/<name>.pkl` (sympy ground truth in `x0, x1, …`).
-30 problems. Set `SRSD_ROOT` if you keep it elsewhere.
+Expected layout: `srsd-feynman_medium/{train,val,test}/<name>.txt` (space-separated, last column = target;
+8000/1000/1000 rows) and `srsd-feynman_medium/true_eq/<name>.pkl` (sympy ground truth in `x0, x1, …`).
+40 problems, 1–6 inputs. Constants range from about 1e-78 to 1e87, so scale targets in float64 before
+converting to float32 tensors. Set `SRSD_ROOT` if the data is elsewhere (e.g. on Google Drive). The code
+also works with the Easy set: point `SRSD_ROOT` at it.
 
 ## Tests
 

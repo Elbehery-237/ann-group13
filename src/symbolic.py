@@ -22,7 +22,7 @@ from typing import Any, Callable
 import numpy as np
 import sympy as sp
 
-DEFAULT_ROOT = Path(__file__).resolve().parents[1] / "data" / "srsd-feynman_easy"
+DEFAULT_ROOT = Path(__file__).resolve().parents[1] / "data" / "srsd-feynman_medium"
 
 
 # ---------------------------------------------------------------------------
@@ -31,7 +31,7 @@ DEFAULT_ROOT = Path(__file__).resolve().parents[1] / "data" / "srsd-feynman_easy
 def load_true_eq(name: str, root: Path | str = DEFAULT_ROOT) -> sp.Expr:
     """Load the ground-truth sympy expression for one SRSD problem.
 
-    root: an SRSD set folder containing true_eq/ (e.g. data/srsd-feynman_easy).
+    root: an SRSD set folder containing true_eq/ (e.g. data/srsd-feynman_medium).
     Variables are x0..x_{d-1}, in the same order as the data columns (last column = target).
     """
     path = Path(root) / "true_eq" / f"{name}.pkl"

@@ -6,7 +6,7 @@ import pytest
 import sympy as sp
 from types import SimpleNamespace
 
-from conftest import EASY, SRSD_ROOT, load_srsd, needs_data
+from conftest import PROBLEMS, SRSD_ROOT, first_present, load_srsd, needs_data
 from src.symbolic import (is_exact, load_true_eq, ned, predict, round_floats,
                           to_original, with_timeout)
 
@@ -29,9 +29,9 @@ def scaled_form(true, xs, ys, d):
     return (true.subs(subs, simultaneous=True) - ys.mean) / ys.std
 
 
-# --- plan "done when" conditions on all 30 Easy problems --------------------------------
+# --- plan "done when" conditions on every problem in the set --------------------------------
 @needs_data
-@pytest.mark.parametrize("name", EASY)
+@pytest.mark.parametrize("name", PROBLEMS)
 def test_ground_truth_is_exact_with_zero_ned(name):
     true = load_true_eq(name, SRSD_ROOT)
     assert is_exact(true, true)
@@ -39,7 +39,7 @@ def test_ground_truth_is_exact_with_zero_ned(name):
 
 
 @needs_data
-@pytest.mark.parametrize("name", EASY)
+@pytest.mark.parametrize("name", PROBLEMS)
 def test_wrong_formula_is_not_exact(name):
     true = load_true_eq(name, SRSD_ROOT)
     wrong = true + sp.Symbol("x0") ** 3        # changes the structure in every problem
@@ -49,7 +49,7 @@ def test_wrong_formula_is_not_exact(name):
 
 # --- to_original on real data -------------------------------------------------------------
 @needs_data
-@pytest.mark.parametrize("name", EASY)
+@pytest.mark.parametrize("name", PROBLEMS)
 def test_to_original_round_trip(name):
     data = load_srsd(name)
     true = load_true_eq(name, SRSD_ROOT)
@@ -64,7 +64,10 @@ def test_to_original_round_trip(name):
 
 @needs_data
 def test_to_original_with_log_columns():
-    name = "feynman-i.12.1"                     # both inputs positive -> log10 allowed
+    # a problem whose inputs are all positive, so log10 scaling is allowed
+    name = first_present("feynman-i.39.10", "feynman-i.12.1")
+    if name is None:
+        pytest.skip("no suitable problem in this set")
     data = load_srsd(name, log_cols=(0, 1))
     true = load_true_eq(name, SRSD_ROOT)
     back = to_original(scaled_form(true, data["xscaler"], data["yscaler"], 2),
