@@ -1,2 +1,4 @@
-# Colab already provides torch, numpy, sympy. Pin only what it lacks.
+# For Google Colab: torch, numpy, sympy, pandas, matplotlib are preinstalled; pin only what Colab lacks.
+# Record Colab's own versions (printed by notebooks/00_setup.ipynb) in Section V.
 zss==1.2.0
+pykan==0.2.8
