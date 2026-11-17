@@ -1,12 +1,12 @@
 """Smoke-test the shared production data loader and training harness.
 
-Run from the repository root after the data owner supplies ``src.data.load_problem``:
+Run from the repository root after installing dependencies and setting ``SRSD_ROOT``:
 
     SRSD_ROOT=/path/to/srsd-feynman_medium python scripts/phase_c_data_smoke.py
 
 The script uses one known linear Medium equation, keeps the official test split out
 of training/validation, and reports test metrics only after the shared trainer returns.
-It intentionally fails with a clear message while ``src/data.py`` is still a stub.
+It fails with a clear diagnostic if the production loader or required dataset is unavailable.
 """
 from __future__ import annotations
 
@@ -25,10 +25,11 @@ if str(REPO_ROOT) not in sys.path:
 
 try:
     from src.data import load_problem
-except ImportError as exc:  # expected until the owner implements the production loader
+except ImportError as exc:
     raise SystemExit(
-        "Production smoke test unavailable: src.data.load_problem is not implemented. "
-        "Wait for the S1 owner to provide it; do not substitute tests.conftest.load_srsd."
+        "Production smoke test unavailable: could not import src.data.load_problem. "
+        "Check the repository checkout and installed dependencies; do not substitute "
+        "tests.conftest.load_srsd."
     ) from exc
 
 from src.train import set_seed, train

@@ -71,16 +71,24 @@ def to_original(expr_scaled: sp.Expr, xs: Any, ys: Any, d: int) -> sp.Expr:
     """
     x = sp.symbols(f"x0:{d}")
     log_cols = set(getattr(xs, "log_cols", ()) or ())
+    def decimal(value: Any) -> sp.Rational:
+        """Interpret scaler metadata as its recorded decimal, not a binary float."""
+        numeric = float(value)
+        if not np.isfinite(numeric):
+            raise ValueError(f"scaler metadata must be finite; got {value!r}")
+        return sp.Rational(str(value))
+
     subs = {}
     for i in range(d):
-        lo, hi = float(xs.lo[i]), float(xs.hi[i])
+        lo, hi = decimal(xs.lo[i]), decimal(xs.hi[i])
         if hi == lo:
             raise ValueError(f"column {i} is constant on the train split (lo == hi == {lo})")
         g = sp.log(x[i], 10) if i in log_cols else x[i]
         scaled = 2 * (g - lo) / (hi - lo) - 1
         subs[sp.Symbol(f"x_{i + 1}")] = scaled
         subs[sp.Symbol(f"x{i}")] = scaled
-    return expr_scaled.subs(subs, simultaneous=True) * float(ys.std) + float(ys.mean)
+    return (expr_scaled.subs(subs, simultaneous=True) * decimal(ys.std)
+            + decimal(ys.mean))
 
 
 # ---------------------------------------------------------------------------

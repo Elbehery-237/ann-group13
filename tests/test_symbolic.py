@@ -7,6 +7,7 @@ import sympy as sp
 from types import SimpleNamespace
 
 from conftest import PROBLEMS, SRSD_ROOT, first_present, load_srsd, needs_data
+from src.data import load_problem
 from src.symbolic import (is_exact, load_true_eq, ned, predict, round_floats,
                           to_original, with_timeout)
 
@@ -23,10 +24,25 @@ def scaled_form(true, xs, ys, d):
     model working on S1-scaled data would return."""
     u = sp.symbols(f"x_1:{d + 1}")
     subs = {}
+    def decimal(value):
+        return sp.Rational(str(value))
+
     for i in range(d):
-        g = (u[i] + 1) / 2 * (float(xs.hi[i]) - float(xs.lo[i])) + float(xs.lo[i])
+        lo, hi = decimal(xs.lo[i]), decimal(xs.hi[i])
+        g = (u[i] + 1) / 2 * (hi - lo) + lo
         subs[sp.Symbol(f"x{i}")] = 10 ** g if i in xs.log_cols else g
-    return (true.subs(subs, simultaneous=True) - ys.mean) / ys.std
+    return (true.subs(subs, simultaneous=True) - decimal(ys.mean)) / decimal(ys.std)
+
+
+def scaled_form_float(true, xs, ys, d):
+    """Reproduce the historical forward helper's Python-float scaler arithmetic."""
+    u = sp.symbols(f"x_1:{d + 1}")
+    subs = {}
+    for i in range(d):
+        lo, hi = float(xs.lo[i]), float(xs.hi[i])
+        g = (u[i] + 1) / 2 * (hi - lo) + lo
+        subs[sp.Symbol(f"x{i}")] = 10 ** g if i in xs.log_cols else g
+    return (true.subs(subs, simultaneous=True) - float(ys.mean)) / float(ys.std)
 
 
 # --- plan "done when" conditions on every problem in the set --------------------------------
@@ -48,6 +64,74 @@ def test_wrong_formula_is_not_exact(name):
 
 
 # --- to_original on real data -------------------------------------------------------------
+@pytest.mark.parametrize("name", ["feynman-i.39.10", "feynman-ii.34.29a"])
+@needs_data
+def test_decimal_scaler_round_trip_regressions(name):
+    """These equations exposed cancellation residuals from binary-float scaler constants."""
+    data = load_problem(name, root=SRSD_ROOT)
+    true = load_true_eq(name, SRSD_ROOT)
+    d = data["d"]
+    scaled = scaled_form(true, data["xscaler"], data["yscaler"], d)
+    recovered = to_original(scaled, data["xscaler"], data["yscaler"], d)
+    assert is_exact(recovered, true, round_digits=6)
+
+
+@pytest.mark.parametrize("name", ["feynman-i.39.10", "feynman-ii.34.29a"])
+@needs_data
+def test_to_original_float_forward_regressions_against_ground_truth(name):
+    """Exercise the historical float-based forward formula and compare to the pickle truth."""
+    data = load_problem(name, root=SRSD_ROOT)
+    true = load_true_eq(name, SRSD_ROOT)
+    d = data["d"]
+    scaled = scaled_form_float(true, data["xscaler"], data["yscaler"], d)
+    assert scaled.atoms(sp.Float), "historical Python-float scaling must introduce SymPy Float artifacts"
+    recovered = to_original(scaled, data["xscaler"], data["yscaler"], d)
+    test = data["raw"]["test"]
+    np.testing.assert_allclose(
+        predict(recovered, test[:, :d]), test[:, d], rtol=1e-6,
+        atol=1e-9 * np.abs(test[:, d]).max(),
+    )
+    # Float contamination is already part of the input expression. The inverse should
+    # preserve predictions, but symbolic exactness is not expected on this historical path.
+    assert not is_exact(recovered, true, round_digits=6)
+
+
+def test_to_original_decimal_scalers_reconstruct_an_independent_linear_truth():
+    xs = SimpleNamespace(lo=["0.1"], hi=["0.9"], log_cols=set())
+    ys = SimpleNamespace(mean="0.3", std="0.7")
+    u = sp.Symbol("x_1")
+    # Independent exact-decimal forward equation for y=x0.
+    scaled = (sp.Rational(1, 10) + (u + 1) * sp.Rational(2, 5) - sp.Rational(3, 10)) / sp.Rational(7, 10)
+    recovered = to_original(scaled, xs, ys, d=1)
+    assert sp.simplify(recovered - x0) == 0
+
+
+def test_float_scaler_path_preserves_predictions_despite_float_artifacts():
+    xs = SimpleNamespace(lo=[0.1], hi=[0.9], log_cols=set())
+    ys = SimpleNamespace(mean=0.3, std=0.7)
+    true = 2 * x0**2 + 3 * x0
+    scaled = scaled_form_float(true, xs, ys, d=1)
+    assert scaled.atoms(sp.Float), "Python-float scaler arithmetic must leave Float artifacts"
+    recovered = to_original(scaled, xs, ys, d=1)
+    probe = np.linspace(-2.0, 2.0, 101).reshape(-1, 1)
+    np.testing.assert_allclose(predict(recovered, probe), predict(true, probe), rtol=1e-12, atol=1e-12)
+
+
+def test_to_original_preserves_a_genuine_small_physical_constant():
+    xs = SimpleNamespace(lo=["0.1"], hi=["0.9"], log_cols=set())
+    ys = SimpleNamespace(mean="0.3", std="0.7")
+    u = sp.Symbol("x_1")
+    tiny = sp.Rational(3313, 10**37)
+    true = tiny * x0 + sp.Rational(8854, 10**15)
+    x_from_u = sp.Rational(1, 10) + (u + 1) * sp.Rational(2, 5)
+    scaled = (true.subs(x0, x_from_u) - sp.Rational(3, 10)) / sp.Rational(7, 10)
+    recovered = to_original(scaled, xs, ys, d=1)
+    assert sp.simplify(recovered - true) == 0
+    recovered_slope = sp.simplify(sp.diff(recovered, x0))
+    assert recovered_slope != 0
+    assert recovered_slope == tiny
+
+
 @needs_data
 @pytest.mark.parametrize("name", PROBLEMS)
 def test_to_original_round_trip(name):
