@@ -10,12 +10,17 @@ outputs 0 gets MSE = 0.0) and squared errors on 1e38 targets overflow to inf.
 Standardising y is only a change of units for training; it is undone here before
 anything is reported, so it cannot make a result look better.
 
-Headline metric (aggregated across equations): NRMSE = RMSE / std(y_test), ddof = 0,
-as in Petersen et al., "Deep Symbolic Regression" (ICLR 2021). Equivalently
-NRMSE = sqrt(1 - R^2). It is unit-free, so it can be compared across equations.
-Also reported: R^2 and the SRSD "accuracy" flag R^2 > 0.999 (Matsubara et al., DMLR 2024).
-MSE / RMSE / MAE are in original units and differ by orders of magnitude between
-equations: report them per equation only; never average or take medians across equations.
+The five reported metrics (n test points, e_i = yhat_i - y_i, ybar = mean of y_test):
+    MSE   = (1/n) sum e_i^2                       original units squared
+    RMSE  = sqrt(MSE)                             original units
+    MAE   = (1/n) sum |e_i|                       original units
+    R^2   = 1 - MSE / Var(y_test)                 unit-free, 1 = perfect, 0 = predicting ybar
+    NRMSE = RMSE / std(y_test)  (ddof = 0)        unit-free, 0 = perfect, 1 = predicting ybar
+NRMSE follows Petersen et al., "Deep Symbolic Regression" (ICLR 2021); NRMSE = sqrt(1 - R^2).
+
+Aggregation rule: MSE, RMSE and MAE carry the units of each equation (targets range from
+~1e-37 to ~2e38), so they are reported PER EQUATION only. Across equations only the
+unit-free NRMSE (headline) and R^2 are summarised (median and IQR).
 """
 from __future__ import annotations
 
@@ -24,7 +29,7 @@ import time
 
 import numpy as np
 
-R2_ACCURACY_THRESHOLD = 0.999      # SRSD / SRBench "accuracy" criterion
+METRICS = ("mse", "rmse", "mae", "r2", "nrmse")
 
 
 def regression_metrics(y_true, y_pred) -> dict:
@@ -43,8 +48,7 @@ def regression_metrics(y_true, y_pred) -> dict:
     var = std ** 2
     nrmse = rmse / std if std > 0 else float("nan")
     r2 = 1.0 - mse / var if var > 0 else float("nan")
-    return dict(nrmse=nrmse, r2=r2, acc_r2_0999=bool(finite and r2 > R2_ACCURACY_THRESHOLD),
-                mse=mse, rmse=rmse, mae=mae, finite_pred=finite)
+    return dict(mse=mse, rmse=rmse, mae=mae, r2=r2, nrmse=nrmse, finite_pred=finite)
 
 
 def inverse_target(y_scaled, yscaler) -> np.ndarray:
@@ -93,36 +97,30 @@ def save_predictions(folder: str, model_name: str, spec: str, equation: str, see
     return path
 
 
-def summarize(df, by=("model", "spec")):
-    """Cross-equation summary with unit-free metrics only.
-
-    Step 1: per (model, spec, equation), take the median over the 3 seeds.
-    Step 2: across equations, report median and IQR of NRMSE (headline), median R^2 and the
-            accuracy rate (share of equations whose seed-median R^2 > 0.999).
-    Diverged runs are kept (NRMSE = inf counts as worst), never dropped."""
+def per_equation(df, by=("model", "spec")):
+    """All five metrics per (model, spec, equation): median over the seeds."""
     by = list(by)
-    agg = dict(nrmse=("nrmse", "median"), r2=("r2", "median"))
-    for c in ("n_params", "train_time_s"):
-        if c in df:
-            agg[c] = (c, "median")
+    cols = [c for c in (*METRICS, "n_params", "train_time_s") if c in df]
+    out = df.groupby(by + ["equation"])[cols].median()
     if "diverged" in df:
-        agg["diverged"] = ("diverged", "sum")
-    per_eq = df.groupby(by + ["equation"]).agg(**agg).reset_index()
-    per_eq["acc_r2_0999"] = per_eq["r2"] > R2_ACCURACY_THRESHOLD
+        out["diverged_runs"] = df.groupby(by + ["equation"])["diverged"].sum()
+    return out.reset_index()
 
+
+def summarize(df, by=("model", "spec")):
+    """Cross-equation summary: median and IQR of NRMSE (headline) and R^2, computed from the
+    seed medians of each equation. MSE / RMSE / MAE are not aggregated (different units per
+    equation); see per_equation(). Diverged runs are kept (NRMSE = inf counts as worst)."""
+    by = list(by)
+    pe = per_equation(df, by)
+    g = pe.groupby(by)
     q = lambda p: (lambda s: s.quantile(p))
-    g = per_eq.groupby(by)
     out = g.agg(equations=("nrmse", "size"),
-                nrmse_median=("nrmse", "median"),
-                nrmse_q1=("nrmse", q(0.25)),
-                nrmse_q3=("nrmse", q(0.75)),
-                r2_median=("r2", "median"),
-                acc_rate=("acc_r2_0999", "mean"))
-    if "diverged" in per_eq:
-        out["diverged_runs"] = g["diverged"].sum()
-    if "n_params" in per_eq:
-        out["params_median"] = g["n_params"].median()
-    if "train_time_s" in per_eq:
-        out["train_time_median_s"] = g["train_time_s"].median()
-    out["nrmse_iqr"] = out["nrmse_q3"] - out["nrmse_q1"]
+                nrmse_median=("nrmse", "median"), nrmse_q1=("nrmse", q(.25)), nrmse_q3=("nrmse", q(.75)),
+                r2_median=("r2", "median"), r2_q1=("r2", q(.25)), r2_q3=("r2", q(.75)))
+    if "diverged_runs" in pe:
+        out["diverged_runs"] = g["diverged_runs"].sum()
+    for c, name in (("n_params", "params_median"), ("train_time_s", "train_time_median_s")):
+        if c in pe:
+            out[name] = g[c].median()
     return out.reset_index()
