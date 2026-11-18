@@ -1,1 +1,6 @@
-# kan2 config (B-spline KAN)
+# KAN-2 — KAN-1 with grid extension 5 -> 10 -> 20 (one result row per grid stage)
+spec: KAN-2
+hidden: [5]
+grid: 5
+k: 3
+grids: [5, 10, 20]

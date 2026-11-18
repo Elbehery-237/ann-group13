@@ -1,1 +1,5 @@
-# kan3 config (B-spline KAN)
+# KAN-3 — KAN-1 with quadratic splines (k = 2). Optional: run only if time allows.
+spec: KAN-3
+hidden: [5]
+grid: 5
+k: 2

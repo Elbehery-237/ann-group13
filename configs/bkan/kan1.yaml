@@ -1,1 +1,5 @@
-# kan1 config (B-spline KAN)
+# KAN-1 — baseline B-spline KAN [d, 5, 1], grid G = 5, cubic splines (k = 3)
+spec: KAN-1
+hidden: [5]
+grid: 5
+k: 3

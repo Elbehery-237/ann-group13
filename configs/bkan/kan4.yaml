@@ -1,1 +1,5 @@
-# kan4 config (B-spline KAN)
+# KAN-4 — MultKAN [d, [5, 2], 1]: 5 sum nodes + 2 multiplication nodes in the hidden layer
+spec: KAN-4
+hidden: [[5, 2]]
+grid: 5
+k: 3

@@ -1,1 +1,11 @@
-# symbolic config (B-spline KAN)
+# Interpretability pipeline (separate from the accuracy runs): LBFGS + sparsity -> prune -> snap -> refit
+hidden: [5]
+grid: 5
+k: 3
+lambdas: [1.0e-4, 1.0e-3, 1.0e-2]   # sparsity strength, chosen on validation NRMSE
+steps_sparse: 200
+steps_after_prune: 100
+steps_refit: 50
+library: [x, x^2, x^3, x^4, sqrt, 1/x, exp, log, sin, cos]
+round_digits: 4                       # significant figures for is_exact (report in the paper)
+simplify_timeout_s: 20
